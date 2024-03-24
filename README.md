@@ -25,8 +25,8 @@ This project involves the development of a web application aimed at stream-based
 Clone this repository and install the requirements.
 
 ```bash
-git clone https://gitlab.lrz.de/00000000014A5260/processdiscoveryws23.git
-cd processdiscoveryws23
+git clone https://github.com/MartinMF/process_discovery.git
+cd process_discovery
 pip install -r requirements.txt
 ```
 
