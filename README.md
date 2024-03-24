@@ -52,11 +52,11 @@ Once the server is running, visit localhost:8000 for the web interface.
     - TUM-Benzin-Pra-WS-23-3
     - Coopis 2010.
 
-    ![image](https://i.postimg.cc/kX0vhhKq/instance-amount.png)
+    ![image](https://i.postimg.cc/QdcJLkJ5/process-selection.png)
 
 2. Select how many instances of the selected model should be executed.
 
-    ![image](https://i.postimg.cc/QdcJLkJ5/process-selection.png)
+    ![image](https://i.postimg.cc/kX0vhhKq/instance-amount.png)
 
 3. Choose an update mode:
     - Time interval: The model will pull updates every X milliseconds.
