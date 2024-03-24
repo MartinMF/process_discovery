@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Process Discovery</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <!-- script src="https://cdnjs.cloudflare.com/ajax/libs/viz.js/1.8.0/viz-lite.js"></script -->
+    <script src="{{ url_for('static', filename='viz.js') }}"></script>
+    <script src="{{ url_for('static', filename='full_render.js') }}"></script>
+
+    <script src="{{ url_for('static', filename='main.js') }}"></script>
+    <script src="{{ url_for('static', filename='svg_exporter.js') }}"></script>
+
+</head>
+<style>
+    div::-webkit-scrollbar {
+        display: none;
+    }
+
+    div {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+
+    body {
+        overflow-x: hidden;
+    }
+</style>
+<body>
+
+</body>
+</html>
