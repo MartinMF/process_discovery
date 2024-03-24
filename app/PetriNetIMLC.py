@@ -270,6 +270,38 @@ class PetriNetIMLC:
         for i in range(2, len(self.places)):
             self.places[i].name = f"P{i}"
 
+        # p0 -1> tau -2> p1 -3> tau -4> p2  =>  p0 -1> tau -4> p2
+        try:
+            transitions_to_remove = []
+            arcs_to_remove = set()
+            places_to_remove = []
+            new_arcs = set()
+            for place in self.places[2:]:
+                incoming_transitions = [a.source for a in self.arcs if a.target == place]
+                outgoing_transitions = [a.target for a in self.arcs if a.source == place]
+                original_places = [a.source for a in self.arcs if a.target in incoming_transitions]
+                final_places = [a.target for a in self.arcs if a.source in outgoing_transitions]
+                if all([t.label == "τ" for t in incoming_transitions + outgoing_transitions]) and \
+                        len(incoming_transitions) == len(outgoing_transitions) == 1 and \
+                        len(original_places) == len(final_places) == 1:
+                    for a in self.arcs:
+                        if a.source in incoming_transitions:
+                            for final_place in final_places:
+                                new_arcs |= {Arc(a.source, final_place)}
+                        if place in [a.source, a.target]:
+                            arcs_to_remove |= {a}
+                    places_to_remove += [place]
+
+            self.arcs = (self.arcs | new_arcs) - arcs_to_remove
+            [self.transitions.remove(t) for t in transitions_to_remove]
+            [self.places.remove(p) for p in places_to_remove]
+        except Exception as e:
+            print(e)
+
+        # Rename places
+        for i in range(2, len(self.places)):
+            self.places[i].name = f"P{i}"
+
 
 if __name__ == "__main__":
     from app.miner import get_traces_from_log, get_digraph_from_custom_petri_net

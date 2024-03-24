@@ -14,7 +14,7 @@ from app.PetriNetIMLC import PetriNetIMLC
 def get_digraph_from_custom_petri_net(petri_net):
     penwidth = 1
     places = "\n".join([
-        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth}];' if \
+        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth+2}];' if \
             p.name in ["P0", "P1"] else \
             f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth}];'
         for p in petri_net.places])

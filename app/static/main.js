@@ -272,6 +272,7 @@ process_submit_button.addEventListener("click", () => {
     if (selected_update_mode === update_modes[0]) {  // interval-based
         update_interval = setInterval(update_interval_function, parseInt(update_mode_event_amount_input.value));
     } else if (selected_update_mode === update_modes[1]) {
+        batch_size = parseInt(update_mode_event_amount_input.value);
         start_event_listener();
     }
 
@@ -325,6 +326,7 @@ let update_interval_function = () => {
         // console.log(dg)
         if(dg.length > 0) {
             update_graph_container(dg, selection.old_process === selection.process_name);
+            display_selected_node_information();
         } else {
             graph_container.text = "";
         } send_request("POST", "traces", {process_name: selection.process_name}).then(r => {
@@ -358,8 +360,8 @@ let update_interval_function = () => {
                     width: width+"px"
                 });
             }
+            selection.old_process = selection.process_name;
         })
-        selection.old_process = selection.process_name;
     })
 }
 
@@ -377,10 +379,11 @@ let start_event_listener = () => {
     };
 
     event_source.onmessage = event => {
-        console.log(`Received: ${event.data} new data entries`)
+        // console.log(`Received: ${event.data} new data entries`)
         let new_entries = event.data;
         total_new_entries += parseInt(new_entries);
         if (total_new_entries >= batch_size) {
+            // console.log(`Updating model now after ${total_new_entries} new log entries`);
             update_interval_function();
             total_new_entries = 0;
         }
@@ -597,6 +600,7 @@ let update_graph_interactions = () => {
     parse_activity_data()
     send_request("GET", "activity_data").then(activity_data => {
         parse_activity_data(activity_data);
+        display_selected_node_information();
     }).catch(e => {});
 
     add_svg_interaction_listeners();
@@ -626,7 +630,7 @@ let add_node_interactions = e => {
 
 let select_node = e => {
     let n = e.currentTarget;
-    console.log("Clicked: " + n.id);
+    // console.log("Clicked: " + n.id);
     if (n === selection.deselected_node) {
         selection.deselected_node = null;
     } else {
@@ -660,43 +664,47 @@ let display_selected_node_information = () => {
     // info_data_x (id, name, earliest, median, average, latest
     let current_information = saved_activity_data[selection.process_name];
     let node = selection.svg_node;
-    let activity_id = node.querySelector("text").innerHTML;
-    if (node.classList.contains("transition")) {
-        if (!activity_id.includes("τ")) {
-            let activity_info = current_information[activity_id];
-            // console.log(activity_info)
-            let timestamps = Object.values(activity_info["timestamps"]).reduce((acc, timestamps) => acc.concat(timestamps), []);
-            let dates = timestamps.map(timestamp => new Date(timestamp));
-            dates.sort((a, b) => a - b);
-            let format_date = date => {
-                let options = {
-                    hour12: false,
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                };
-                let formatted_date = date.toLocaleString('de-DE', options);
-                let time = formatted_date.split(',')[1];
-                let ddmmyyyy = formatted_date.split(',')[0];
-                return `${time}, ${ddmmyyyy}`;
+    if (node) {
+        if (node.classList.contains("transition")) {
+            let activity_id = node.querySelector("text").innerHTML;
+            if (!activity_id.includes("τ")) {
+                let activity_info = current_information[activity_id];
+                // console.log(activity_info)
+                let timestamps = Object.values(activity_info["timestamps"]).reduce((acc, timestamps) => acc.concat(timestamps), []);
+                let dates = timestamps.map(timestamp => new Date(timestamp));
+                dates.sort((a, b) => a - b);
+                let format_date = date => {
+                    let options = {
+                        hour12: false,
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    };
+                    let formatted_date = date.toLocaleString('de-DE', options);
+                    let time = formatted_date.split(',')[1];
+                    let ddmmyyyy = formatted_date.split(',')[0];
+                    return `${time}, ${ddmmyyyy}`;
+                }
+                let earliest = format_date(dates[0]);
+                let median = format_date(dates[Math.floor(dates.length / 2)]);
+                let latest = format_date(dates[dates.length - 1]);
+                let sum = dates.reduce((acc, date) => acc + date.getTime(), 0);
+                let average = format_date(new Date(sum / dates.length));
+
+                display_information(activity_id,
+                    activity_info.name ? activity_info.name : node.querySelector("text").innerHTML,
+                    earliest, median, average, latest);
+                // console.log()
             }
-            let earliest = format_date(dates[0]);
-            let median = format_date(dates[Math.floor(dates.length / 2)]);
-            let latest = format_date(dates[dates.length - 1]);
-            let sum = dates.reduce((acc, date) => acc + date.getTime(), 0);
-            let average = format_date(new Date(sum / dates.length));
-
-            display_information(activity_id,
-                activity_info.name? activity_info.name: node.querySelector("text").innerHTML,
-                earliest, median, average, latest);
-            // console.log()
+        } else {
+            display_no_information();
         }
-    }
 
-    graph_container.appendChild(card_container);
+        graph_container.appendChild(card_container);
+    }
 };
 
 let generate_node_selector = n => {
