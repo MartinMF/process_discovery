@@ -499,6 +499,27 @@ def correct_incomplete_traces(traces: List[List[Activity]]) -> List[List[Activit
     return corrected_traces
 
 
+def are_parallel(log, partitions, root_dfg):
+    if not concurrent_start_end_activities(log, partitions, root_dfg):
+        return False
+    for pa in partitions:
+        for pb in [s for s in partitions if s != pa]:
+            for a in pa:
+                for b in pb:
+                    if not directly_reaches(a, b, root_dfg) or not directly_reaches(b, a, root_dfg):
+                        return False
+    return True
+
+
+def are_concurrent_p(ccg, p):
+    for pa in p:
+        for pb in [s for s in p if s != pa]:
+            if not are_concurrent(pa, pb, ccg):
+                return False
+    return True
+
+
+
 class InductiveMinerLifeCycle:
     def __init__(self, traces, root_dfg=None):
         traces = correct_incomplete_traces(traces)
@@ -536,16 +557,6 @@ class InductiveMinerLifeCycle:
             sub_logs, cut_partition, cut_type = self.find_sequence_cuts()
         if cut_type == CutType.UNKNOWN:
             sub_logs, cut_partition, cut_type = self.find_interleaved_cuts()
-            if cut_type == CutType.INTERLEAVING:
-                if self.debug:
-                    print(f"[+] Sublogs: {sub_logs}, Partitions: {cut_partition}, CutType: {cut_type} -> ", end="")
-                self.cut_type = cut_type
-                if self.debug:
-                    print(f"{self.cut_type.value}{cut_partition}")
-                self.log = [InductiveMinerLifeCycle([[a.get_start(), a.get_complete()]]) for a in self.activities]
-                for imlc in self.log: imlc.find_sublogs_cuts(self.debug)
-                self.built_process_tree = True
-                return
         if cut_type == CutType.UNKNOWN:
             sub_logs, cut_partition, cut_type = self.find_parallel_cuts()
         if cut_type == CutType.UNKNOWN:
@@ -621,22 +632,6 @@ class InductiveMinerLifeCycle:
         p = sorted(new_partitions, key=functools.cmp_to_key(reachability_sort))
         return sub_logs, p, CutType.SEQUENCE
 
-    def find_maybe_interleaved_cuts(self):
-        p = [{n} for n in self.activities]
-        for a in self.activities:
-            for b in self.activities:
-                if is_concurrent(a, b, self.ccg):  # and a != b:
-                    pa = find_item(a, p)
-                    pb = find_item(b, p)
-                    if pa != pb:
-                        p.remove(pa)
-                        p.remove(pb)
-                        p.append(pa | pb)
-                # print(f"Did not join {a} and {b} because {a}->{b}: {reaches(a,b,self.dfg)}; {b}->{a}: {reaches(a,b,self.dfg)}\nDFG: {self.dfg}")
-        # if not reaches(a, b, self.dfg) or not reaches(b, a, self.dfg):
-        if len(p) == 1:
-            return None, None, CutType.UNKNOWN
-
     def find_interleaved_cuts(self):
         p = [{n} for n in self.activities]
         np = [{n} for n in self.activities]
@@ -656,11 +651,7 @@ class InductiveMinerLifeCycle:
         if not concurrent_start_end_activities(self.log, p, self.root_dfg):
             return None, None, CutType.UNKNOWN
 
-        concurrent = True
-        for pa in p:
-            for pb in [s for s in p if s != pa]:
-                if not are_concurrent(pa, pb, self.ccg):
-                    concurrent = False
+        concurrent = are_concurrent_p(self.ccg, p)
 
         if not concurrent:
             for a in self.activities:
@@ -673,17 +664,23 @@ class InductiveMinerLifeCycle:
                             np.remove(npa)
                             np.remove(npb)
                             np.append(npa | npb)
-
             if len(np) > 1:
                 p = np
-                concurrent = True
+                if are_concurrent_p(self.ccg, p):
+                    concurrent = True
+                else:
+                    concurrent = False
+            else:
+                concurrent = False
 
         # print(f"Interleaved/concurrent? p: {p}")
         if len(p) == 1:
             return None, None, CutType.UNKNOWN
 
         sub_logs = create_sublogs(self.log, p)
-        # print(f"Created logs: {sub_logs}")
+        # print(f"Traces: {self.log}")
+        # print(f"Interleaving: {self.ccg}")
+        # print(f"New sublogs: {sub_logs}")
         return sub_logs, p, CutType.INTERLEAVING if not concurrent else CutType.PARALLEL
 
     def find_parallel_cuts(self):
@@ -832,7 +829,7 @@ if __name__ == "__main__":
     l_c = Activity("l", "c")
 
     # Examples:
-    # traces = [[i_s, i_c, m_s, m_c, x_s, l_s, x_c, l_c, f_s, f_c], [i_s, i_c, l_s, x_s, x_c, m_s, l_c, m_c, f_s, f_c]]
+    traces = [[i_s, i_c, m_s, m_c, x_s, l_s, x_c, l_c, f_s, f_c], [i_s, i_c, l_s, x_s, x_c, m_s, l_c, m_c, f_s, f_c]]
     # traces = [[m_s, m_c, x_s, l_s, x_c, l_c], [l_s, x_s, x_c, m_s, l_c, m_c]]
     # traces = [[a_s, a_c, b_s, e_s, f_s, b_c, c_s, e_c, c_c, f_c, d_s, d_c]]
     # traces = [[a_s, a_c, b_s, e_s, b_c, f_s, c_s, e_c, c_c, f_c, d_s, d_c]]
@@ -852,7 +849,7 @@ if __name__ == "__main__":
     # traces = [[a_s, a_c, b_s, b_c, c_s, c_c, e_s, e_c], [a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, b_s, b_c, c_s, c_c, e_s, e_c]]
     # traces = [[a_s, a_s, a_c, a_c, b_s, b_c, c_c, c_s, d_s, d_c]]
     # traces = [[a_s, a_c, d_s, d_c, g_s, g_c], [a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, e_s, e_c, f_s, f_c, g_s, g_c]]
-    traces = [[a_s, a_c, b_s, b_c, c_s, c_c], [c_s, c_c, a_s, a_c, b_s, b_c]]
+    # traces = [[a_s, a_c, b_s, b_c, c_s, c_c], [c_s, c_c, a_s, a_c, b_s, b_c]]
 
     miner = InductiveMinerLifeCycle(traces)
     cuts = miner.find_sublogs_cuts(True)

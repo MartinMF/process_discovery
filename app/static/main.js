@@ -44,11 +44,20 @@ let send_request = (method, url, data) => {
 
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
-                resolve(JSON.parse(xhr.response));
+                let responseData;
+                try {
+                    responseData = JSON.parse(xhr.response);
+                } catch (error) {
+                    // reject("Invalid JSON response");
+                    // return;
+                    responseData = xhr.response;
+                }
+                resolve(responseData);
             } else {
                 reject(xhr.statusText);
             }
         };
+
 
         xhr.onerror = function () {
             reject(xhr.statusText);
@@ -258,6 +267,10 @@ process_submit_button.addEventListener("click", () => {
     selection.process_name = process_selector.value;
     selection.process_amount = parseInt(process_amount_input.value);
     process_amount_input.value = "0";
+    instance_status = {};
+    selection.svg_node = null;
+    selection.node_selector = null;
+
 
     // start processes
     send_request("POST", "start_process_instances", {
@@ -286,11 +299,7 @@ process_submit_button.addEventListener("click", () => {
 });
 
 
-let stop_update_interval_button = document.createElement("button");
-stop_update_interval_button.style.margin = "10px";
-stop_update_interval_button.textContent = "Stop";
-stop_update_interval_button.disabled = true;
-stop_update_interval_button.addEventListener("click", () => {
+let stop_updating = () => {
     if (selected_update_mode === update_modes[0]) {
         if (update_interval) {
             clearInterval(update_interval);
@@ -301,7 +310,13 @@ stop_update_interval_button.addEventListener("click", () => {
 
     stop_update_interval_button.disabled = true;
     process_submit_button.disabled = false;
-});
+};
+
+let stop_update_interval_button = document.createElement("button");
+stop_update_interval_button.style.margin = "10px";
+stop_update_interval_button.textContent = "Stop";
+stop_update_interval_button.disabled = true;
+stop_update_interval_button.addEventListener("click", stop_updating);
 
 let clear_all_logs_button = document.createElement("button");
 clear_all_logs_button.style.margin = "10px";
@@ -326,52 +341,136 @@ let update_interval;
 // each node has information on: process_name, instance_id and name/label
 
 let update_interval_function = () => {
+    if (Object.keys(instance_status).length > 0 && (Object.keys(instance_status).every(instance => instance_status[instance].status === "finished" || instance_status[instance].status === "stopped"))) {
+        stop_updating();
+        return;
+    }
     send_request("POST", "digraph", {process_name: selection.process_name}).then(r => {
-        let dg = r.message;
-        // update svg digraph
-        // console.log(dg)
         update_last_updated_label();
+        let dg = r.message;
         if(dg.length > 0) {
             update_graph_container(dg, selection.old_process === selection.process_name);
         } else {
             graph_container.text = "";
         } send_request("POST", "traces", {process_name: selection.process_name}).then(r => {
-
             traces_display_container.show();
             let traces = r.message;
-            if (r.message.length > 0) {
-                // console.log(traces)
-
-                traces_display_container.apply_design({
-                    left: "",
-                    transform: "",
-                    width: ""
-                });
-
-                traces_display_content.text = traces.replaceAll(/\n/g, "<br>").replaceAll(/;/g, "; ")
-                    .replaceAll(/(\d+): /g,
-                        "<a href='https://cpee.org/flow/?monitor=https://cpee.org/flow/engine/$1/' target='_blank'>$1</a>: ");
-                let width = traces_display_content.div.getBoundingClientRect().width;
-
-                traces_display_container.apply_design({
-                    left: "50%",
-                    transform: "translate(-50%)",
-                    width: width+"px"
-                });
-            }
-            else {
-                traces_display_content.text = "No traces analyzed yet."
-                let width = traces_display_content.div.getBoundingClientRect().width;
-                traces_display_container.apply_design({
-                    left: "50%",
-                    transform: "translate(-50%)",
-                    width: width+"px"
-                });
-            }
-            selection.old_process = selection.process_name;
+            // Restart stopped instances
+            restart_stopped_instances(traces);
+            update_trace_information(traces);
         });
-    })
+    });
 }
+
+
+let update_trace_information = traces => {
+    if (traces.length > 0) {
+        // console.log(traces)
+
+        traces_display_container.apply_design({
+            left: "",
+            transform: "",
+            width: ""
+        });
+
+        assign_links_and_colors_to_traces(traces);
+        let width = traces_display_content.div.getBoundingClientRect().width;
+
+        traces_display_container.apply_design({
+            left: "50%",
+            transform: "translate(-50%)",
+            width: width+"px"
+        });
+    }
+    else {
+        traces_display_content.text = "No traces analyzed yet."
+        let width = traces_display_content.div.getBoundingClientRect().width;
+        traces_display_container.apply_design({
+            left: "50%",
+            transform: "translate(-50%)",
+            width: width+"px"
+        });
+    }
+    selection.old_process = selection.process_name;
+}
+
+let assign_links_and_colors_to_traces = traces => {
+    traces_display_content.text = traces.replaceAll(/\n/g, "<br>").replaceAll(/;/g, "; ")
+        .replaceAll(/(\d+): /g, (match, instance) => {
+            let status = instance_status[instance] ? instance_status[instance].status : null;
+            let color = status ? get_status_color(status) : "black";
+            return `<a style='color: ${color}' href='https://cpee.org/flow/?monitor=https://cpee.org/flow/engine/${instance}/' target='_blank'>${instance}</a>: `;
+        });
+};
+
+let get_status_color = status => {
+    return status === "finished"? "green": status === "restarted"? "orange": status === "running"? "blue": status === "stopped"? "red": "black";
+}
+
+
+let restart_stopped_instances = traces => {
+    const regex = /^\d+(?=:)/gm;
+    let instances = traces.match(regex);
+    if (instances === null) return;
+    instances.map(s => parseInt(s)).forEach(instance => {
+        // do not try to restart instances too often
+        if (instance_status[instance] && instance_status[instance].n_restarted >= restart_threshold) {
+            instance_status[instance].status = "stopped";
+            return;
+        }
+
+        let url = `https://cpee.org/flow/engine/${instance}//properties/state/`;
+        send_request("GET", url).then(r => {
+            if (!instance_status[instance]) {
+                instance_status[instance] = {n_restarted: 0, status: "running"};
+            }
+            if (r === "stopped") restart_instance(instance);
+            if (r === "finished") instance_status[instance].status = "finished";
+            if (r === "running") {
+                if (instance_status[instance].status !== "restarted") {
+                    instance_status[instance].status = "running";
+                }
+            }
+
+            assign_links_and_colors_to_traces(traces);
+        });
+    });
+};
+
+
+let instance_status = {};  // instance: {n_restarted: int, status: str = finished|restarted|running|stopped},
+let restart_threshold = 3;
+
+let restart_instance = instance => {
+    if (instance in instance_status) {
+        instance_status[instance].n_restarted++;
+        instance_status[instance].status = "restarted";
+    } else {
+        instance_status[instance] = {n_restarted: 1, status: "restarted"};
+    }
+
+    let url = `https://cpee.org/flow/engine/${instance}//properties/state/`;
+    fetch(url, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept': '*/*',
+            'Origin': 'https://cpee.org',
+            'Referer': `https://cpee.org/flow/?monitor=https://cpee.org/flow/engine/${instance}/`,
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: new URLSearchParams({value: "running"})
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        console.log(`Restarted instance ${instance} after it stopped.`);
+
+    }).catch(_ => {
+        console.log(`Could not restart instance ${instance}`);
+    });
+};
+
 
 
 // Event-based updating

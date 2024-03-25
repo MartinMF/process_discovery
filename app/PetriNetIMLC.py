@@ -5,6 +5,7 @@ class Place:
     def __init__(self, name):
         self.name = name
         self.tokens = 0
+        self.active = False
 
     def __repr__(self):
         return self.name
@@ -49,7 +50,7 @@ class Arc:
 
 class PetriNetIMLC:
     def __init__(self, imlc_miner=None):
-        self.initial_place = Place(f"P0")
+        self.initial_place = Place(f"P0"); self.initial_place.active = True
         self.final_place = Place(f"P1")
         self.initial_transition = Transition("T0")
         self.places = [self.initial_place, self.final_place]
@@ -191,6 +192,7 @@ class PetriNetIMLC:
             self.arcs.add(Arc(self.initial_place, start_transition))
             self.arcs.add(Arc(end_transition, self.final_place))
             interleaving_place = self.add_new_place()
+            interleaving_place.active = True
             for t, _ in sub_nets:
                 place_0 = self.add_new_place()
                 place_1 = self.add_new_place()

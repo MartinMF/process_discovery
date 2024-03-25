@@ -14,9 +14,13 @@ from app.PetriNetIMLC import PetriNetIMLC
 def get_digraph_from_custom_petri_net(petri_net):
     penwidth = 1
     places = "\n".join([
-        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth+2}];' if \
-            p.name in ["P0", "P1"] else \
-            f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth}];'
+        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth+2}];'
+        if p.name == "P0" else \
+        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth+1}];'
+        if p.name == "P1" else \
+        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth+2}];'
+        if p.active else \
+        f'\t\t"{id(p)}" [label=<<B>{p.name[0] + "<SUB>" + p.name[1:] + "</SUB>"}</B>>, class="place", penwidth={penwidth}];'
         for p in petri_net.places])
     transitions = "\n".join([
         f'\t\t"{id(t)}" [label=<<B>{t.label}</B>>, name="{t.name}", class="transition", penwidth={penwidth}];' if \
