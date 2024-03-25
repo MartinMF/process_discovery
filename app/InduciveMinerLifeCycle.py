@@ -1,6 +1,5 @@
 import functools
 import itertools
-from collections import defaultdict
 from enum import Enum
 from typing import List, Tuple, Set
 
