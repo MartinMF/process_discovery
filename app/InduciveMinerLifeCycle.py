@@ -609,19 +609,14 @@ class InductiveMinerLifeCycle:
                 return 1  # pa >= pb
 
         p = sorted(p, key=functools.cmp_to_key(reachability_sort))
-        print(f"p: {p}")
 
         # In sublogs with traces with > 1 consecutive taus, these will be merged, partitions respectively
         sub_logs = create_sublogs(self.log, p)
-        print(f"Created sublogs: {sub_logs}")
 
         transposed_logs = [sum(list(trace), []) for trace in list(zip(*sub_logs))]  # old traces
         collapsed_traces, new_partitions = collapsed_tau_traces_partitions(transposed_logs, p)
         p = sorted(new_partitions, key=functools.cmp_to_key(reachability_sort))
         sub_logs = create_sublogs(collapsed_traces, p)
-
-        print(f"new created sublogs: {sub_logs}")
-        print(f"p: {p}")
 
         p = sorted(new_partitions, key=functools.cmp_to_key(reachability_sort))
         return sub_logs, p, CutType.SEQUENCE
