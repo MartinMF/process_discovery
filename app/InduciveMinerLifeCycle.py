@@ -11,7 +11,6 @@ class CutType(Enum):
     PARALLEL = "+"  # ∧
     LOOP = "◯"
     INTERLEAVING = "<->"
-    # MAYBE_INTERLEAVING = "<?>"
     UNKNOWN = "?"
     MINIMAL = ""
 
