@@ -332,7 +332,7 @@ def collapsed_tau_traces_partitions(transposed_traces, partitions):
                 collapsed_partition |= activities
             else:
                 collapsed_trace += [a]
-                if len(collapsed_partition):
+                if len(collapsed_partition) and collapsed_partition not in collapsed_activities:
                     collapsed_activities += [collapsed_partition]
                 collapsed_partition = set()
                 started_tau, completed_tau = False, False
@@ -609,13 +609,19 @@ class InductiveMinerLifeCycle:
                 return 1  # pa >= pb
 
         p = sorted(p, key=functools.cmp_to_key(reachability_sort))
+        print(f"p: {p}")
 
         # In sublogs with traces with > 1 consecutive taus, these will be merged, partitions respectively
         sub_logs = create_sublogs(self.log, p)
+        print(f"Created sublogs: {sub_logs}")
+
         transposed_logs = [sum(list(trace), []) for trace in list(zip(*sub_logs))]  # old traces
         collapsed_traces, new_partitions = collapsed_tau_traces_partitions(transposed_logs, p)
         p = sorted(new_partitions, key=functools.cmp_to_key(reachability_sort))
         sub_logs = create_sublogs(collapsed_traces, p)
+
+        print(f"new created sublogs: {sub_logs}")
+        print(f"p: {p}")
 
         p = sorted(new_partitions, key=functools.cmp_to_key(reachability_sort))
         return sub_logs, p, CutType.SEQUENCE
@@ -847,15 +853,16 @@ if __name__ == "__main__":
     # traces = [[a_s, a_c, b_s, b_c, c_s, c_c, a_s, a_c]]
     # traces = [[a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, a_s, a_c, b_s, b_c]]
     # traces = [[a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, a_s, a_c, b_s, b_c, b_s, b_c]]
-    traces = [[a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, a_s, a_c, c_s, c_c, d_s, d_c, a_s, a_c, b_s, b_c]]
+    # traces = [[a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, a_s, a_c, c_s, c_c, d_s, d_c, a_s, a_c, b_s, b_c]]
     # traces = [[a_s, a_c, b_s, b_c, c_s, c_c, e_s, e_c], [a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, b_s, b_c, c_s, c_c, e_s, e_c]]
     # traces = [[a_s, a_s, a_c, a_c, b_s, b_c, c_c, c_s, d_s, d_c]]
     # traces = [[a_s, a_c, d_s, d_c, g_s, g_c], [a_s, a_c, b_s, b_c, c_s, c_c, d_s, d_c, e_s, e_c, f_s, f_c, g_s, g_c]]
+    traces = [[a_s, a_c, b_s, b_c, c_s, c_c], [c_s, c_c, a_s, a_c, b_s, b_c]]
 
     miner = InductiveMinerLifeCycle(traces)
     cuts = miner.find_sublogs_cuts(True)
     print(miner.process_tree)
     print(miner.ccg)
     # print()
-    # print(miner.dfg)
+    print(miner.dfg)
     # print(miner.ccg)
