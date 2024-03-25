@@ -241,6 +241,7 @@ let refresh_download_button = () => {
     }
 };
 
+
 let process_submit_button = document.createElement("button");
 let export_button = null;
 process_submit_button.style.margin = "10px";
@@ -249,6 +250,8 @@ process_submit_button.textContent = "Run";
 // SUBMIT BUTTON (RUN)
 
 process_submit_button.addEventListener("click", () => {
+    graph_information_buttons_container.appendChild(graph_container);
+
     if (update_interval) clearInterval(update_interval);
     process_submit_button.disabled = true;
     selection.old_process = selection.process_name;
@@ -265,11 +268,14 @@ process_submit_button.addEventListener("click", () => {
         // console.log(r.message);
     });
 
+
+
+
     // start update mode
-    update_interval_function();  // initial update
     selected_update_mode = update_mode_selector.value;
 
     if (selected_update_mode === update_modes[0]) {  // interval-based
+    update_interval_function();  // initial update
         update_interval = setInterval(update_interval_function, parseInt(update_mode_event_amount_input.value));
     } else if (selected_update_mode === update_modes[1]) {
         batch_size = parseInt(update_mode_event_amount_input.value);
@@ -324,12 +330,14 @@ let update_interval_function = () => {
         let dg = r.message;
         // update svg digraph
         // console.log(dg)
+        update_last_updated_label();
         if(dg.length > 0) {
             update_graph_container(dg, selection.old_process === selection.process_name);
-            display_selected_node_information();
         } else {
             graph_container.text = "";
         } send_request("POST", "traces", {process_name: selection.process_name}).then(r => {
+
+            traces_display_container.show();
             let traces = r.message;
             if (r.message.length > 0) {
                 // console.log(traces)
@@ -361,7 +369,7 @@ let update_interval_function = () => {
                 });
             }
             selection.old_process = selection.process_name;
-        })
+        });
     })
 }
 
@@ -488,13 +496,24 @@ let init_graph_interactions = () => {
             graph_container.div.style.userSelect = "none";
             svg.userSelect = "none"
         } else if (e1.button === 0) {
-            if (selection.svg_node) {  // deselect node
-                selection.svg_node.querySelector("polygon, ellipse").setAttribute("stroke", "black");
+            if (selection.svg_node && (e1.target === selection.svg_node.querySelector("polygon") || e1.target === selection.svg_node.querySelector("text"))) {
+                console.log("clicked selected node")
+                // && !(e1.target === selection.svg_node.querySelector("polygon") || e1.target === selection.svg_node.querySelector("text"))
+            }
+            if (selection.svg_node  && e1.target !== export_button) {  // deselect node
+                // selection.svg_node.querySelector("polygon, ellipse").setAttribute("stroke", "black");
+                selection.svg_node.querySelector("polygon, ellipse").setAttribute("fill", "rgba(0,0,0,0)")
                 selection.deselected_node = selection.svg_node;
                 selection.svg_node = null;
                 selection.node_selector = null;
                 graph_container.div.removeChild(card_container.div);
                 display_no_information();
+                // refresh_download_button();
+            } else {
+
+            }
+            if (e1.target !== export_button) {
+                refresh_download_button();
             }
         } else {
             console.log(e1.button)
@@ -583,8 +602,10 @@ let init_graph_interactions = () => {
 let update_graph_interactions = () => {
     // svg related
     svg = graph_container.div.querySelector("svg");
-    svg.setAttribute("width", window.getComputedStyle(graph_container.div).width)
-    svg.setAttribute("height", window.getComputedStyle(graph_container.div).height)
+    if (window.getComputedStyle(graph_container.div).width.length !== 0) {
+        svg.setAttribute("width", window.getComputedStyle(graph_container.div).width)
+        svg.setAttribute("height", window.getComputedStyle(graph_container.div).height)
+    }
     let vb = svg.getAttribute("viewBox").split(" ");
     svg_data.view_box = {x: parseFloat(vb[0]), y: parseFloat(vb[1]), w: parseFloat(vb[2]), h:parseFloat(vb[3])}
     svg.style.userSelect = "none";
@@ -643,6 +664,7 @@ let select_node = e => {
 let process_selected_node = () => {
     highlight_selected_node();
     display_selected_node_information();
+    refresh_download_button();
 };
 
 let highlight_selected_node = () => {
@@ -653,7 +675,8 @@ let highlight_selected_node = () => {
             if (generate_node_selector(node) === selection.node_selector) {
                 selection.svg_node = node;
                 let poly = selection.svg_node.querySelector("polygon, ellipse");
-                poly.setAttribute("stroke", "red");
+                // poly.setAttribute("stroke", "red");
+                poly.setAttribute("fill", "rgba(255,0,0,0.5)")
                 break;
             }
         }
@@ -743,6 +766,8 @@ let update_graph_container = (digraph, same_process) => {
         add_svg_interaction_listeners();
 
         refresh_download_button();
+        display_selected_node_information();
+        graph_container.appendChild(last_updated_label);
     });
 };
 
@@ -776,6 +801,28 @@ let set_translation = translation => {
 }
 
 
+let last_updated_label = new Element({
+    position: "absolute",
+    left: "0",
+    bottom: "0",
+    margin: "5px",
+}, "");
+
+let update_last_updated_label = () => {
+    last_updated_label.text = `Last updated: ${get_current_time()}`;
+};
+
+let get_current_time = () => {
+    let now = new Date();
+
+    let hours = String(now.getHours()).padStart(2, '0');
+    let minutes = String(now.getMinutes()).padStart(2, '0');
+    let seconds = String(now.getSeconds()).padStart(2, '0');
+    let day = String(now.getDate()).padStart(2, '0');
+    let month = String(now.getMonth() + 1).padStart(2, '0'); // January is 0
+    let year = now.getFullYear();
+    return `${hours}:${minutes}:${seconds}, ${day}.${month}.${year}`;
+}
 
 /***************************************** TD ***********************************************/
 traces_display_container.apply_design({
@@ -885,9 +932,9 @@ window.onload = () => {
     header_container.show();
     interaction_buttons_container.show();
     graph_information_buttons_container.show();
-    traces_display_container.show();
+    // traces_display_container.show();
 
-    graph_information_buttons_container.appendChild(graph_container);
+    // graph_information_buttons_container.appendChild(graph_container);
 
     interaction_buttons_container.appendChild(process_selector_container);
     process_selector_container.appendChild(process_selector_label, false);
@@ -909,10 +956,6 @@ window.onload = () => {
 
     traces_display_container.appendChild(traces_display_header);
     traces_display_container.appendChild(traces_display_content);
-
-
-
-
 
 
     // card_container.appendChild(selection_container);
