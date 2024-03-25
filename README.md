@@ -77,7 +77,14 @@ Once the server is running, visit localhost:8000 for the web interface.
 6. Click the "Stop" button to halt the model updating. Note: The instances will continue to run in the background.
 7. Click the "Clear logs" button to delete all collected event-information from the log.
 
-Hold right click to move the Petri Net around, click an element to see relevant information and zoom in/out by scrolling 
+Hold right click to move the Petri Net around, click an element to see relevant information and scroll to zoom in/out 
+
+### Instance colors:
+
+    - Green: Process instance finished
+    - Yellow: Process instance stopped and was restarted
+    - Red: Process instance stopped and was not restarted (restarted too often)
+    - Blue: Process instance is still running
 
 ---
 
