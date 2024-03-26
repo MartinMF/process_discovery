@@ -92,7 +92,8 @@ let traces_display_container = new Element({}, "");
 header_container.apply_design({
     fontWeight: "bolder",
     fontSize: "2.5em",
-    width: "calc(100vw - 40px)",
+    width: "100vw",
+    // width: "calc(100vw - 40px)",
     textAlign: "center",
     margin: "20px 0 20px 0",
     border: "0px solid red"
@@ -509,7 +510,7 @@ let stop_event_listener = () => {
 
 /***************************************** GIBC ***********************************************/
 graph_information_buttons_container.apply_design({
-    width: "calc(100vw - 40px)",
+    width: "100vw",  // "calc(100vw - 40px)",
     display: "flex",
     justifyContent: "center",
     // margin: "20px",
