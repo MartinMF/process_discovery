@@ -357,15 +357,32 @@ def get_start_end_activities_from_trace(trace: List[Activity]) -> Tuple[List[Act
     return starts, ends
 
 
-def get_start_end_activities_from_traces(traces: List[List[Activity]]) -> Tuple[Set[Activity], Set[Activity]]:
+def get_start_end_activities_from_traces(traces: List[List[Activity]], ignore_tau=False) -> Tuple[
+    Set[Activity], Set[Activity]]:
     start_activities = []
     end_activities = []
     for trace in traces:
         start, end = get_start_end_activities_from_trace(trace)
         start_activities.append(start)
         end_activities.append(end)
-    common_start_activities = set.intersection(*map(set, start_activities))
-    common_end_activities = set.intersection(*map(set, end_activities))
+    common_start_activities = set()
+    common_end_activities = set()
+    if ignore_tau:
+        start_non_taus = [l for l in start_activities if len(l) > 0]
+        end_non_taus = [l for l in end_activities if len(l) > 0]
+        if len(start_non_taus) == 0:
+            common_start_activities = set()
+        else:
+            # print(map(set, start_non_taus))
+            common_start_activities = set.intersection(*map(set, start_non_taus))
+        if len(end_non_taus) == 0:
+            common_end_activities = set()
+        else:
+            # print(map(set, end_non_taus))
+            common_end_activities = set.intersection(*map(set, end_non_taus))
+    else:
+        common_start_activities = set.intersection(*map(set, start_activities))
+        common_end_activities = set.intersection(*map(set, end_activities))
     return common_start_activities, common_end_activities
 
 
@@ -517,6 +534,81 @@ def are_concurrent_p(ccg, p):
     return True
 
 
+def is_valid_loop(do_set, redo_set, log, dfg, debug=False):
+    do_start, do_end = get_start_end_activities_from_traces(
+        [sum([[a] for a in trace if a.get_default() in do_set], []) for trace in log])
+    redo_start, redo_end = get_start_end_activities_from_traces(
+        [sum([[a] for a in trace if a.get_default() in redo_set], []) for trace in log], True)
+    if debug:
+        print(do_set, do_end, redo_start, redo_end)
+        print("Redo traces:", [sum([[a] for a in trace if a.get_default() in redo_set], []) for trace in log])
+    if 0 in [len(p) for p in [do_start, do_end, redo_start, redo_end]]:
+        return False
+    for b in redo_start:
+        if not [directly_reaches(a, b, dfg) for a in do_end]:
+            return False
+    for b in redo_start:
+        if not [directly_reaches(b, a, dfg) for a in do_start]:
+            return False
+    s = next(iter(do_start))
+    e = next(iter(do_end))
+    for b in redo_set:
+        if b in get_nodes_between(s, e, dfg):
+            return False
+    return True
+
+
+def get_nodes_between(x, y, dfg):
+    adj_list = {}
+    for edge in dfg:
+        u, v = edge
+        if u not in adj_list:
+            adj_list[u] = []
+        adj_list[u].append(v)
+
+    def dfs(node, target, visited, path):
+        visited.add(node)
+        path.append(node)
+        if node == target:
+            return path
+        if node in adj_list:
+            for neighbor in adj_list[node]:
+                if neighbor not in visited:
+                    result = dfs(neighbor, target, visited, path)
+                    if result:
+                        return result
+        path.pop()
+
+    visited = set()
+    path = []
+    result_path = dfs(x, y, visited, path)
+
+    return set(result_path) - {x, y}
+
+
+def extend_loop_cut_old(do_set, redo_set, log, dfg):
+    new_do, new_redo = False, False
+    for b in redo_set:
+        new_do, new_redo = do_set | {b}, redo_set - {b}
+        if is_valid_loop(new_do, new_redo, log, dfg):
+            return [new_do, new_redo]
+        else:
+            new_do, new_redo = extend_loop_cut(new_do, new_redo, log, dfg)
+    return [new_do, new_redo]
+
+
+def extend_loop_cut(do_set, redo_set, log, dfg):
+    max_do, max_redo = do_set, redo_set
+    for b in redo_set:
+        new_do, new_redo = do_set | {b}, redo_set - {b}
+        if is_valid_loop(new_do, new_redo, log, dfg):
+            max_do, max_redo = new_do, new_redo
+            new_max_do, new_max_redo = extend_loop_cut(new_do, new_redo, log, dfg)
+            if len(new_max_do) > len(max_do):
+                max_do, max_redo = new_max_do, new_max_redo
+    return max_do, max_redo
+
+
 
 class InductiveMinerLifeCycle:
     def __init__(self, traces, root_dfg=None):
@@ -566,11 +658,8 @@ class InductiveMinerLifeCycle:
             self.built_process_tree = True
             return
         if self.debug:
-            print(f"[+] Sublogs: {sub_logs}, Partitions: {cut_partition}, CutType: {cut_type} -> ", end="")
+            print(f"[+] {cut_type.value}{cut_partition} - Traces: {self.log}")
         self.cut_type = cut_type
-        if self.debug:
-            print(f"{self.cut_type.value}{cut_partition}")
-            # print(f"[!] {self.log} -> {sub_logs}")
 
         new_imlcs = [InductiveMinerLifeCycle(log, self.root_dfg) for log in sub_logs]
 
@@ -727,11 +816,11 @@ class InductiveMinerLifeCycle:
 
         # move nodes from redo set to do set if they violate any loop cut conditions
         # If ∃x->a <=> ∃b->a AND if b->∃a <=> ∃x->a
-        for b in redo_set:
-            if any([directly_reaches(a, b, self.dfg) and a not in end_activities or \
-                    directly_reaches(b, a, self.dfg) and a not in start_activities for a in do_set]):
-                do_set -= {b}
-                redo_set |= {b}
+        if not is_valid_loop(do_set, redo_set, self.log, self.dfg):
+            new_do, new_redo = extend_loop_cut(do_set, redo_set, self.log, self.dfg)
+            do_set, redo_set = new_do, new_redo
+            if not new_do and not new_redo:
+                return None, None, CutType.UNKNOWN
 
         if len(do_set) > 0 and len(redo_set) > 0:
             p = [do_set, redo_set]

@@ -92,9 +92,9 @@ let traces_display_container = new Element({}, "");
 header_container.apply_design({
     fontWeight: "bolder",
     fontSize: "2.5em",
-    width: "100vw",
+    width: "calc(100vw - 40px)",
     textAlign: "center",
-    margin: "20px",
+    margin: "20px 0 20px 0",
     border: "0px solid red"
 });
 
@@ -102,12 +102,12 @@ header_container.apply_design({
 /***************************************** IBC ***********************************************/
 
 interaction_buttons_container.apply_design({
-    width: "100vw",
+    width: "calc(100vw - 40px)",
     textAlign: "center",
     display: "flex",
     flexDirection: "column",
     justifyContent: "center",
-    margin: "20px",
+    margin: "20px 0 20px 0",
     // height: "10vh",
     border: "0px solid red"
 });
@@ -439,7 +439,7 @@ let restart_stopped_instances = traces => {
 
 
 let instance_status = {};  // instance: {n_restarted: int, status: str = finished|restarted|running|stopped},
-let restart_threshold = 3;
+let restart_threshold = 1;
 
 let restart_instance = instance => {
     if (instance in instance_status) {
@@ -509,10 +509,10 @@ let stop_event_listener = () => {
 
 /***************************************** GIBC ***********************************************/
 graph_information_buttons_container.apply_design({
-    width: "100vw",
+    width: "calc(100vw - 40px)",
     display: "flex",
     justifyContent: "center",
-    margin: "20px",
+    // margin: "20px",
     border: "0px solid red",
     position: "relative",
 });
@@ -524,8 +524,9 @@ let graph_container = new Element({
     display: "flex",
     justifyContent: "center",
     alignContent: "center",
-    margin: "0 20px 0 20px",
-    height: "max(35em, 60vh)",
+    margin: "0",
+    // height: "max(20em, 60vh)",
+    height: "28em",
     overflow: "hidden", // SVG should not have width or height attributes,
     position: "relative",
 }, `

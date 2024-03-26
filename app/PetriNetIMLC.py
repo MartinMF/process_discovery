@@ -283,6 +283,8 @@ class PetriNetIMLC:
                 outgoing_transitions = [a.target for a in self.arcs if a.source == place]
                 original_places = [a.source for a in self.arcs if a.target in incoming_transitions]
                 final_places = [a.target for a in self.arcs if a.source in outgoing_transitions]
+                if self.initial_place in original_places or self.final_place in final_places:
+                    break
                 if all([t.label == "τ" for t in incoming_transitions + outgoing_transitions]) and \
                         len(incoming_transitions) == len(outgoing_transitions) == 1 and \
                         len(original_places) == len(final_places) == 1:
@@ -311,7 +313,7 @@ if __name__ == "__main__":
     parent_dir = os.path.abspath(os.path.join(os.getcwd(), '..'))
     os.chdir(parent_dir)
 
-    traces = get_traces_from_log("Coopis 2010")
+    traces = get_traces_from_log("TUM-Benzin-Pra-WS-23-2")
     traces = [list(trace.values())[0] for trace in traces]
     miner = InductiveMinerLifeCycle(traces)
     miner.find_sublogs_cuts()
@@ -319,4 +321,4 @@ if __name__ == "__main__":
     petri_net = PetriNetIMLC(miner)
     print(petri_net)
     digraph = get_digraph_from_custom_petri_net(petri_net)
-    print(digraph)
+    # print(digraph)
